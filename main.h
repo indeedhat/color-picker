@@ -7,10 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+// point in space
 typedef struct {
     int x;
     int y;
 } point;
+
+// window hints
+typedef struct Hints
+{
+    unsigned long   flags;
+    unsigned long   functions;
+    unsigned long   decorations;
+    long            inputMode;
+    unsigned long   status;
+} Hints;
 
 
 int query_pointer(point *, point *);

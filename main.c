@@ -1,37 +1,35 @@
 #include "main.h"
 #include "clipboard.h"
 
+
 static int _XlibErrorHandler(Display *display, XErrorEvent *event) {
     fprintf(stderr, "An error occured detecting the mouse position\n");
     return True;
 }
 
 Display *display;
-
 Window root_window;
 Window window_returned;
 Window window;
 Window win_label;
-
 unsigned int mask_return;
-
 int screen;
-
 XImage *image;
-
-char msg[19];
+char *rgbText;
 
 int main(void) {
     Bool result;
     XColor color;
     XEvent event;
+    point root_pos;
+    point win_pos;
+    point prev_pos;
+
+    rgbText = malloc(19);
 
     setup_x();
     create_window();
 
-    point root_pos;
-    point win_pos;
-    point prev_pos;
 
     init_clipboard(display);
 
@@ -45,13 +43,7 @@ int main(void) {
 
             case ButtonRelease:
                 if (event.xbutton.button == 1) {
-                    char *text = malloc(18);
-                    snprintf(text, 18,"rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
-                    printf("%s\n", text);
-                    printf("%s\n", (unsigned char *)text);
-                    copy_to_clipboard(display, window, (unsigned char *)text, 18);
-                    printf("copy done\n");
-                    goto end;
+                    goto clipboard;
                 } else if (event.xbutton.button == 3) {
                     printf("right click");
                     goto end;
@@ -78,6 +70,11 @@ int main(void) {
         pixel_color_at_pos(root_pos, &color);
         render(root_pos, color);
     }
+
+clipboard:
+    // copy to clipboard and fork the process to listen for requests
+    // child process will be closed when another program takes control of the selection
+    copy_to_clipboard(display, window, (unsigned char *)rgbText, 18);
 
 end:
     XCloseDisplay(display);
@@ -135,6 +132,22 @@ void create_window() {
     hint->res_class = "floating";
     hint->res_name = "Color Picker";
     XSetClassHint(display, win_label, hint);
+
+    // remove decoration
+    Hints hints;
+    Atom property;
+    hints.flags = 2;
+    hints.decorations = 0;
+    property = XInternAtom(display, "_MOTIF_WM_HINTS", True);
+    XChangeProperty(display, win_label, property, property, 32, PropModeReplace, (unsigned char *)&hints, 5);
+
+    // set as utility window (floatin in i3)
+    Atom properties[3];
+
+    properties[0] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
+    properties[1] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", False);
+    properties[2] = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);   // Let WM know type.
+    XChangeProperty(display, win_label, properties[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) properties, 3);
 }
 
 void pixel_color_at_pos(point pos, XColor *color) {
@@ -158,7 +171,7 @@ void pixel_color_at_pos(point pos, XColor *color) {
 }
 
 void render(point pos, XColor color) {
-    sprintf(msg, "rgb(%03d, %03d, %03d)", color.red / 256, color.green / 256, color.blue / 256);
+    sprintf(rgbText, "rgb(%03d, %03d, %03d)", color.red / 256, color.green / 256, color.blue / 256);
 
     XMoveWindow(display, win_label, pos.x + 10, pos.y + 10);
 
@@ -167,5 +180,5 @@ void render(point pos, XColor color) {
     XFillRectangle(display, win_label, DefaultGC(display, screen), 20, 20, 50, 50);
 
     XSetForeground(display, DefaultGC(display, screen), BlackPixel(display, screen));
-    XDrawString(display, win_label, DefaultGC(display, screen), 90, 50, msg, strlen(msg));
+    XDrawString(display, win_label, DefaultGC(display, screen), 90, 50, rgbText, strlen(rgbText));
 }

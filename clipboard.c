@@ -1,5 +1,7 @@
 #include "clipboard.h"
 
+#define FORK 1
+
 Atom targets_atom;
 Atom text_atom;
 Atom UTF8;
@@ -22,7 +24,6 @@ void copy_to_clipboard(Display *display, Window window, unsigned char *text, int
     Window owner;
 
     // take ownership of selection
-    printf("getting selection ownership\n");
     XSetSelectionOwner(display, selection, window, CurrentTime);
     owner = XGetSelectionOwner(display, selection);
 
@@ -31,34 +32,28 @@ void copy_to_clipboard(Display *display, Window window, unsigned char *text, int
         return;
     }
 
+#ifdef FORK
     // fork background process to handle requests
-    /* printf("forking"); */
-    /* pid_t pid = fork(); */
-    /* if (pid) { */
-    /*     printf("killing parent"); */
-    /*     XSetSelectionOwner(display, selection, None, CurrentTime); */
-    /*     XUngrabPointer(display, CurrentTime); */
-    /*     exit(EXIT_SUCCESS); */
-    /* } */
+    pid_t pid = fork();
+    if (pid) {
+        XSetSelectionOwner(display, selection, None, CurrentTime);
+        XUngrabPointer(display, CurrentTime);
+        exit(EXIT_SUCCESS);
+    }
+#endif
 
-    printf("ungrab\n");
     XUngrabPointer(display, CurrentTime);
 
     while (True) {
-        printf("looping\n");
         usleep(1000);
         XNextEvent(display, &event);
-        printf("got event");
 
         switch (event.type) {
             case SelectionClear:
-                printf("clear\n");
                 return;
 
             case SelectionRequest:
-                printf("request\n");
                 if (event.xselectionrequest.selection != selection) {
-                    printf("wrong selection\n");
                     break;
                 }
 
@@ -87,9 +82,7 @@ void copy_to_clipboard(Display *display, Window window, unsigned char *text, int
                 }
 
                 if ((R & 2) == 0) {
-                    printf("sending: %s\n", text);
                     XSendEvent(display, xev.requestor, 0, 0, (XEvent *)&xev);
-                    printf("sent\n");
                 }
             break;
         }
