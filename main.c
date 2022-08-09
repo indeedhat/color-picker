@@ -1,4 +1,5 @@
 #include "main.h"
+#include "clipboard.h"
 
 static int _XlibErrorHandler(Display *display, XErrorEvent *event) {
     fprintf(stderr, "An error occured detecting the mouse position\n");
@@ -32,6 +33,8 @@ int main(void) {
     point win_pos;
     point prev_pos;
 
+    init_clipboard(display);
+
     while (True) {
         usleep(1000);
         XNextEvent(display, &event);
@@ -42,9 +45,13 @@ int main(void) {
 
             case ButtonRelease:
                 if (event.xbutton.button == 1) {
-                    printf("rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
+                    char *text = malloc(18);
+                    snprintf(text, 18,"rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
+                    printf("%s\n", text);
+                    printf("%s\n", (unsigned char *)text);
+                    copy_to_clipboard(display, window, (unsigned char *)text, 18);
+                    printf("copy done\n");
                     goto end;
-                    // TODO: write to clipboard
                 } else if (event.xbutton.button == 3) {
                     printf("right click");
                     goto end;
@@ -96,7 +103,7 @@ void setup_x() {
 
     XSetErrorHandler(_XlibErrorHandler);
     root_window = XRootWindow(display, 0);
-    XAllowEvents(display, AsyncBoth, CurrentTime);
+    /* XAllowEvents(display, AsyncBoth | SelectionClear | SelectionRequest, CurrentTime); */
 
     XGrabPointer(
         display,
