@@ -30,7 +30,6 @@ int main(void) {
     setup_x();
     create_window();
 
-
     init_clipboard(display);
 
     while (True) {
@@ -72,6 +71,8 @@ int main(void) {
     }
 
 clipboard:
+    // close the color picker window
+    XUnmapWindow(display, win_label);
     // copy to clipboard and fork the process to listen for requests
     // child process will be closed when another program takes control of the selection
     copy_to_clipboard(display, window, (unsigned char *)rgbText, 18);
@@ -125,29 +126,29 @@ void create_window() {
         0, BlackPixel(display, screen), WhitePixel(display, screen)
     );
 
-    XMapWindow(display, win_label);
-    XSelectInput(display, win_label, ExposureMask | KeyPressMask);
+    char *window_name = "Color Picker";
+    Atom properties[3];
+    Atom utf8_str = XInternAtom(display, "UTF8_STRING", False);
 
-    XClassHint *hint = XAllocClassHint();
-    hint->res_class = "floating";
-    hint->res_name = "Color Picker";
-    XSetClassHint(display, win_label, hint);
+    XStoreName(display, win_label, window_name);
+    properties[2] = XInternAtom(display, "_NET_WM_NAME", False);
+    XChangeProperty(display, win_label, properties[2], utf8_str, 8, PropModeReplace, (unsigned char *)window_name, 12);
 
-    // remove decoration
-    Hints hints;
-    Atom property;
-    hints.flags = 2;
-    hints.decorations = 0;
-    property = XInternAtom(display, "_MOTIF_WM_HINTS", True);
-    XChangeProperty(display, win_label, property, property, 32, PropModeReplace, (unsigned char *)&hints, 5);
+    XClassHint hint = { window_name, window_name };
+    XSetClassHint(display, win_label, &hint);
 
     // set as utility window (floatin in i3)
-    Atom properties[3];
-
     properties[0] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
-    properties[1] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", False);
-    properties[2] = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);   // Let WM know type.
-    XChangeProperty(display, win_label, properties[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) properties, 3);
+    properties[1] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_SPLASH", False);
+    properties[2] = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+    XChangeProperty(display, win_label, properties[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) properties, 2L);
+
+    properties[0] = XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
+    properties[2] = XInternAtom(display, "_NET_WM_STATE", False);
+    XChangeProperty(display, win_label, properties[2], XA_ATOM, 32, PropModeReplace, (unsigned char *) properties, 1L);
+
+    XMapWindow(display, win_label);
+    XSelectInput(display, win_label, ExposureMask | KeyPressMask);
 }
 
 void pixel_color_at_pos(point pos, XColor *color) {
