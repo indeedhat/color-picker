@@ -16,6 +16,7 @@ unsigned int mask_return;
 int screen;
 XImage *image;
 char *rgbText;
+int hex_mode;
 
 int main(void) {
     Bool result;
@@ -24,13 +25,16 @@ int main(void) {
     point root_pos;
     point win_pos;
     point prev_pos;
-
     rgbText = malloc(19);
 
     setup_x();
     create_window();
-
     init_clipboard(display);
+
+    unsigned int left_alt = XKeysymToKeycode(display, XK_Alt_L);
+    unsigned int right_alt = XKeysymToKeycode(display, XK_Alt_R);
+
+    int force_render = 0;
 
     while (True) {
         usleep(1000);
@@ -44,13 +48,19 @@ int main(void) {
                 if (event.xbutton.button == 1) {
                     goto clipboard;
                 } else if (event.xbutton.button == 3) {
-                    printf("right click");
                     goto end;
                 }
                 break;
 
             case Expose:
                 render(root_pos, color);
+                break;
+
+            case KeyPress:
+                if (event.xkey.keycode == left_alt || event.xkey.keycode == right_alt) {
+                    hex_mode = hex_mode ? 0 : 1;
+                    force_render = 1;
+                }
                 break;
         }
 
@@ -60,7 +70,7 @@ int main(void) {
         }
 
         // if the cursar hasnt moved then there is nothing to do
-        if (root_pos.x == prev_pos.x && root_pos.y == prev_pos.y) {
+        if (!force_render && root_pos.x == prev_pos.x && root_pos.y == prev_pos.y) {
             continue;
         }
 
@@ -68,6 +78,7 @@ int main(void) {
 
         pixel_color_at_pos(root_pos, &color);
         render(root_pos, color);
+        force_render = 0;
     }
 
 clipboard:
@@ -75,8 +86,7 @@ clipboard:
     XUnmapWindow(display, win_label);
     // copy to clipboard and fork the process to listen for requests
     // child process will be closed when another program takes control of the selection
-    copy_to_clipboard(display, window, (unsigned char *)rgbText, 18);
-
+    copy_to_clipboard(display, window, (unsigned char *)rgbText, strlen(rgbText));
 end:
     XCloseDisplay(display);
 
@@ -101,7 +111,6 @@ void setup_x() {
 
     XSetErrorHandler(_XlibErrorHandler);
     root_window = XRootWindow(display, 0);
-    /* XAllowEvents(display, AsyncBoth | SelectionClear | SelectionRequest, CurrentTime); */
 
     XGrabPointer(
         display,
@@ -115,6 +124,7 @@ void setup_x() {
         CurrentTime
     );
 
+    XSelectInput(display, window, KeyPressMask);
     screen = DefaultScreen(display);
 }
 
@@ -122,7 +132,7 @@ void create_window() {
     win_label = XCreateSimpleWindow(
         display,
         RootWindow(display, screen),
-        0, 0, 300, 100,
+        0, 0, 180, 60,
         0, BlackPixel(display, screen), WhitePixel(display, screen)
     );
 
@@ -172,14 +182,19 @@ void pixel_color_at_pos(point pos, XColor *color) {
 }
 
 void render(point pos, XColor color) {
-    sprintf(rgbText, "rgb(%03d, %03d, %03d)", color.red / 256, color.green / 256, color.blue / 256);
+    if (hex_mode) {
+        snprintf(rgbText, 7, "#%02x%02x%02x", color.red / 256, color.green / 256, color.blue / 256);
+    } else {
+        snprintf(rgbText, 19, "rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
+    }
 
     XMoveWindow(display, win_label, pos.x + 10, pos.y + 10);
 
     XClearWindow(display, win_label);
     XSetForeground(display, DefaultGC(display, screen), color.pixel);
-    XFillRectangle(display, win_label, DefaultGC(display, screen), 20, 20, 50, 50);
+    XFillRectangle(display, win_label, DefaultGC(display, screen), 5, 5, 50, 50);
 
     XSetForeground(display, DefaultGC(display, screen), BlackPixel(display, screen));
-    XDrawString(display, win_label, DefaultGC(display, screen), 90, 50, rgbText, strlen(rgbText));
+    XDrawRectangle(display, win_label, DefaultGC(display, screen), 5, 5, 50, 50);
+    XDrawString(display, win_label, DefaultGC(display, screen), 65, 35, rgbText, strlen(rgbText));
 }
