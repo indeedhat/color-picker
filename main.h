@@ -23,6 +23,13 @@ typedef struct Hints
     unsigned long   status;
 } Hints;
 
+enum {
+    RGBMode,
+    HexMode,
+    RGBValueMade,
+    DisplayModeCount
+};
+
 
 int query_pointer(point *, point *);
 void pixel_color_at_pos(point, XColor *);

@@ -7,16 +7,16 @@ static int _XlibErrorHandler(Display *display, XErrorEvent *event) {
     return True;
 }
 
-Display *display;
-Window root_window;
-Window window_returned;
-Window window;
-Window win_label;
-unsigned int mask_return;
-int screen;
-XImage *image;
-char *rgbText;
-int hex_mode;
+static Display *display;
+static Window root_window;
+static Window window_returned;
+static Window window;
+static Window win_label;
+static unsigned int mask_return;
+static int screen;
+static XImage *image;
+static char *rgbText;
+static int display_mode;
 
 int main(void) {
     Bool result;
@@ -58,7 +58,7 @@ int main(void) {
 
             case KeyPress:
                 if (event.xkey.keycode == left_alt || event.xkey.keycode == right_alt) {
-                    hex_mode = hex_mode ? 0 : 1;
+                    display_mode = ((display_mode + 1) % DisplayModeCount);
                     force_render = 1;
                 }
                 break;
@@ -182,10 +182,16 @@ void pixel_color_at_pos(point pos, XColor *color) {
 }
 
 void render(point pos, XColor color) {
-    if (hex_mode) {
-        snprintf(rgbText, 7, "#%02x%02x%02x", color.red / 256, color.green / 256, color.blue / 256);
-    } else {
-        snprintf(rgbText, 19, "rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
+    switch (display_mode) {
+        case RGBMode:
+            snprintf(rgbText, 19, "rgb(%d, %d, %d)", color.red / 256, color.green / 256, color.blue / 256);
+            break;
+        case HexMode:
+            snprintf(rgbText, 7, "#%02x%02x%02x", color.red / 256, color.green / 256, color.blue / 256);
+            break;
+        case RGBValueMade:
+            snprintf(rgbText, 19, "%d, %d, %d", color.red / 256, color.green / 256, color.blue / 256);
+            break;
     }
 
     XMoveWindow(display, win_label, pos.x + 10, pos.y + 10);
